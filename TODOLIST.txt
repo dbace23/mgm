@@ -1,0 +1,8 @@
+// Hal yang diupdate
+User business service, login, register, dan verifikasi email
+
+// Hal yang belum diupdate
+a. File .env masih belum konek ke database
+b. auth middleware di main.go masih belum di implementasi
+c. kode masih belum di test/uji postman
+d. baru ada service user register, login dan verifikasi email
