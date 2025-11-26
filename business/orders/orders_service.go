@@ -2,6 +2,7 @@ package orders
 
 import (
 	"context"
+	"errors"
 	"myGreenMarket/business/product"
 	"myGreenMarket/domain"
 	"time"
@@ -32,6 +33,12 @@ func (s *OrdersService) CreateOrder(data domain.Orders) (domain.Orders, error) {
 	product, err := s.productsRepo.FindByID(context.TODO(), uint64(data.ProductID))
 	if err != nil {
 		return domain.Orders{}, err
+	}
+	if product.Quantity == 0 {
+		return domain.Orders{}, errors.New("product stock is empty")
+	}
+	if product.Quantity < float64(data.Quantity) {
+		return domain.Orders{}, errors.New("insufficient stock")
 	}
 
 	data.PriceEach = product.NormalPrice

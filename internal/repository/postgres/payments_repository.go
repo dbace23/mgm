@@ -78,3 +78,14 @@ func (r *PaymentsRepository) DeletePayment(payment_id int) error {
 
 	return nil
 }
+
+func (r *PaymentsRepository) GetPaymentByOrderID(order_id int) (domain.Payments, error) {
+	ctx := context.Background()
+	var payment domain.Payments
+	err := r.DB.WithContext(ctx).Where("order_id=?", order_id).First(&payment).Error
+	if err != nil {
+		return domain.Payments{}, err
+	}
+
+	return payment, nil
+}
