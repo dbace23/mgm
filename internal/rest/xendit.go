@@ -19,27 +19,55 @@ type (
 		validate       *validator.Validate
 	}
 
+	// WebhookRequest struct {
+	// 	ID                     string    `json:"id"`
+	// 	ExternalID             string    `json:"external_id"`
+	// 	UserID                 string    `json:"user_id"`
+	// 	IsHigh                 bool      `json:"is_high"`
+	// 	PaymentMethod          string    `json:"payment_method"`
+	// 	Status                 string    `json:"status"`
+	// 	MerchantName           string    `json:"merchant_name"`
+	// 	Amount                 int       `json:"amount"`
+	// 	PaidAmount             int       `json:"paid_amount"`
+	// 	BankCode               string    `json:"bank_code"`
+	// 	PaidAt                 time.Time `json:"paid_at"`
+	// 	PayerEmail             string    `json:"payer_email"`
+	// 	Description            string    `json:"description"`
+	// 	AdjustedReceivedAmount int       `json:"adjusted_received_amount"`
+	// 	FeesPaidAmount         int       `json:"fees_paid_amount"`
+	// 	Updated                time.Time `json:"updated"`
+	// 	Created                time.Time `json:"created"`
+	// 	Currency               string    `json:"currency"`
+	// 	PaymentChannel         string    `json:"payment_channel"`
+	// 	PaymentDestination     string    `json:"payment_destination"`
+	// }
+
 	WebhookRequest struct {
-		ID                     string    `json:"id"`
-		ExternalID             string    `json:"external_id"`
-		UserID                 string    `json:"user_id"`
-		IsHigh                 bool      `json:"is_high"`
-		PaymentMethod          string    `json:"payment_method"`
-		Status                 string    `json:"status"`
-		MerchantName           string    `json:"merchant_name"`
-		Amount                 int       `json:"amount"`
-		PaidAmount             int       `json:"paid_amount"`
-		BankCode               string    `json:"bank_code"`
-		PaidAt                 time.Time `json:"paid_at"`
-		PayerEmail             string    `json:"payer_email"`
-		Description            string    `json:"description"`
-		AdjustedReceivedAmount int       `json:"adjusted_received_amount"`
-		FeesPaidAmount         int       `json:"fees_paid_amount"`
-		Updated                time.Time `json:"updated"`
-		Created                time.Time `json:"created"`
-		Currency               string    `json:"currency"`
-		PaymentChannel         string    `json:"payment_channel"`
-		PaymentDestination     string    `json:"payment_destination"`
+		ID                 string    `json:"id"`
+		Items              []Item    `json:"items"`
+		Amount             int64     `json:"amount"`
+		Status             string    `json:"status"`
+		Created            time.Time `json:"created"`
+		IsHigh             bool      `json:"is_high"`
+		Updated            time.Time `json:"updated"`
+		UserID             string    `json:"user_id"`
+		Currency           string    `json:"currency"`
+		Description        string    `json:"description"`
+		ExternalID         string    `json:"external_id"`
+		MerchantName       string    `json:"merchant_name"`
+		PaymentMethod      string    `json:"payment_method"`
+		PaymentChannel     string    `json:"payment_channel"`
+		PaymentDestination string    `json:"payment_destination"`
+		FailureRedirectURL string    `json:"failure_redirect_url"`
+		SuccessRedirectURL string    `json:"success_redirect_url"`
+	}
+
+	Item struct {
+		Purpose  string `json:"purpose"`
+		Name     string `json:"name"`
+		Price    int64  `json:"price"`
+		Category string `json:"category"`
+		Quantity int64  `json:"quantity"`
 	}
 )
 
@@ -60,15 +88,15 @@ func (ctrl WebhookController) HandleWebhook(c echo.Context) error {
 
 	log.Print("Received webhook from Xendit:", request)
 
-	paymentIDandUserID := strings.Split(request.ExternalID, "|")
+	externalID := strings.Split(request.ExternalID, "|")
 
-	paymentId, _ := strconv.Atoi(paymentIDandUserID[0])
-	userId := paymentIDandUserID[1]
-	intUserId, _ := strconv.Atoi(userId)
+	paymentId, _ := strconv.Atoi(externalID[0])
+	userId, _ := strconv.Atoi(externalID[1])
+	productId, _ := strconv.Atoi(externalID[2])
 
 	err := ctrl.paymentService.UpdatePayment(domain.Payments{
 		ID: paymentId,
-	}, intUserId, request)
+	}, userId, productId, request)
 	if err != nil {
 		log.Println("Failed to update payment status:", err.Error())
 		return c.JSON(http.StatusInternalServerError, fres.Response.StatusInternalServerError(http.StatusInternalServerError))

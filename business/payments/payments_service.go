@@ -61,7 +61,7 @@ func (s *PaymentsService) CreatePayment(data domain.Payments, isWallet bool, use
 	if err != nil {
 		return domain.PaymentWithLink{}, err
 	}
-	paymentLink, err := s.xenditRepo.XenditInvoiceUrl(int(user_id), "TRANSFER", user.FullName, user.Email, product.ProductName, product.ProductCategory, payment.ID, order.Subtotal)
+	paymentLink, err := s.xenditRepo.XenditInvoiceUrl("TRANSFER", user.FullName, user.Email, product.ProductName, product.ProductCategory, int(user.ID), int(product.ID), order.Quantity, payment.ID, order.Subtotal)
 	if err != nil {
 		return domain.PaymentWithLink{}, err
 	}
@@ -81,7 +81,37 @@ func (s *PaymentsService) GetAllPayments() ([]domain.Payments, error) {
 func (s *PaymentsService) GetPayment(payment_id int) (domain.Payments, error) {
 	return s.paymentRepo.GetPayment(payment_id)
 }
-func (s *PaymentsService) UpdatePayment(data domain.Payments, user_id int, request rest.WebhookRequest) error {
+func (s *PaymentsService) UpdatePayment(data domain.Payments, user_id, productId int, request rest.WebhookRequest) error {
+	switch request.Items[0].Purpose {
+	case "TRANSFER":
+		switch request.Status {
+		case "PAID":
+			product, err := s.productRepo.FindByID(context.TODO(), uint64(productId))
+			if err != nil {
+				return err
+			}
+
+			s.productRepo.Update(context.TODO(), &domain.Product{
+				ID:              product.ID,
+				ProductID:       product.ProductID,
+				ProductSKUID:    product.ProductSKUID,
+				IsGreenTag:      product.IsGreenTag,
+				ProductName:     product.ProductName,
+				ProductCategory: product.ProductCategory,
+				Unit:            product.Unit,
+				NormalPrice:     product.NormalPrice,
+				SalePrice:       product.SalePrice,
+				Discount:        product.Discount,
+				Quantity:        product.Quantity - float64(request.Items[0].Quantity),
+				CreatedAt:       product.CreatedAt,
+			})
+
+			data.PaymentMethod = request.PaymentMethod
+			data.PaymentStatus = request.Status
+		case "EXPIRED":
+			data.PaymentStatus = request.Status
+		}
+	}
 	return s.paymentRepo.UpdatePayment(data)
 }
 func (s *PaymentsService) DeletePayment(payment_id int) error {

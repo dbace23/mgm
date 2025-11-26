@@ -26,20 +26,20 @@ func NewXenditRepository(cfg XenditConfig) *XenditRepository {
 	}
 }
 
-func (r XenditRepository) XenditInvoiceUrl(userId int, purpose, username, email, name, category string, paymentId int, amount float64) (string, error) {
+func (r XenditRepository) XenditInvoiceUrl(purpose, username, email, name, category string, userId, productID, quantity, paymentId int, amount float64) (string, error) {
 
 	url := r.xenditConfig.XenditUrl
 	method := "POST"
 	var description string
 	switch purpose {
-	case "PAYMENT":
+	case "TRANSFER":
 		description = fmt.Sprintf("payment order %.2f", amount)
 	case "TOPUP":
 		description = fmt.Sprintf("top up wallet %.2f", amount)
 	}
 
 	payload := strings.NewReader(fmt.Sprintf(`{
-		"external_id": "%d|%d",
+		"external_id": "%d|%d|%d",
 		"amount": %.2f,
 		"description": "%s",
 		"invoice_duration": 3600,
@@ -53,7 +53,7 @@ func (r XenditRepository) XenditInvoiceUrl(userId int, purpose, username, email,
 			{
 			"purpose": %s,
 			"name": "%s",
-			"quantity": 1,
+			"quantity": %d,
 			"price": %.2f,
 			"category": "%s"
 			}
@@ -61,7 +61,7 @@ func (r XenditRepository) XenditInvoiceUrl(userId int, purpose, username, email,
 		"metadata": {
 			"store_branch": "Makassar"
 		}
-	}      `, paymentId, userId, amount, description, email, r.xenditConfig.SuccessRedirectUrl, r.xenditConfig.FailureRedirectUrl, purpose, name, amount, category))
+	}      `, paymentId, userId, productID, amount, description, email, r.xenditConfig.SuccessRedirectUrl, r.xenditConfig.FailureRedirectUrl, purpose, name, quantity, amount, category))
 
 	client := &http.Client{}
 	req, err := http.NewRequest(method, url, payload)
