@@ -65,3 +65,13 @@ func (h *OrdersHandler) CreateOrderItem(c echo.Context) error {
 
 	return c.JSON(http.StatusCreated, fres.Response.StatusCreated(orderItem))
 }
+
+func (h *OrdersHandler) GetAllOrders(c echo.Context) error {
+	orders, err := h.ordersService.GetAllOrders()
+	if err != nil {
+		logger.Error("Failed to create order items", err)
+		return c.JSON(http.StatusBadRequest, ResponseError{Message: err.Error()})
+	}
+
+	return c.JSON(http.StatusCreated, fres.Response.StatusCreated(orders))
+}

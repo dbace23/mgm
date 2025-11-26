@@ -16,9 +16,11 @@ func SetupUserRoutes(api *echo.Group, handler *rest.UserHandler, ordersHandler *
 
 	orders := api.Group("/orders", middleware.AuthMiddleware())
 	orders.POST("", ordersHandler.CreateOrderItem)
+	orders.GET("", ordersHandler.GetAllOrders)
 
 	payments := api.Group("/payments", middleware.AuthMiddleware())
 	payments.POST("", paymentsHandler.CreatePayment)
 
-	api.POST("/webhook/handler", webhookHandler.HandleWebhook)
+	webhook := api.Group("/webhook")
+	webhook.POST("/handler", webhookHandler.HandleWebhook)
 }
