@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"myGreenMarket/app/echo-server/router"
+	productService "myGreenMarket/business/product"
 	userService "myGreenMarket/business/user"
 	"myGreenMarket/internal/middleware"
 	"myGreenMarket/internal/repository/notification"
@@ -56,12 +57,15 @@ func main() {
 
 	// Init repo
 	userRepo := psqlRepo.NewUserRepository(db)
+	productRepo := psqlRepo.NewProductRepository(db)
 
 	// Init service
 	userService := userService.NewUserService(userRepo, validate, mailjetEmail, cfg.App.AppEmailVerificationKey, cfg.App.AppDeploymentUrl)
+	productService := productService.NewProductService(productRepo)
 
 	// Init handler
 	userHandler := rest.NewUserHandler(userService)
+	productHandler := rest.NewProductHandler(productService)
 
 	// Init echo
 	e := echo.New()
@@ -86,6 +90,7 @@ func main() {
 	// Setup routes
 	api := e.Group("/api/v1")
 	router.SetupUserRoutes(api, userHandler)
+	router.SetupProductRoutes(api, productHandler)
 
 	// Goroutine server
 	go func() {

@@ -68,15 +68,6 @@ func (r *ProductRepository) Update(ctx context.Context, product *domain.Product)
 		return fmt.Errorf("context error: %w", err)
 	}
 
-	// Cek apakah product exists
-	var existingProduct domain.Product
-	if err := r.DB.WithContext(ctx).First(&existingProduct, product.ID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errors.New("product not found")
-		}
-		return fmt.Errorf("failed to find product: %w", err)
-	}
-
 	// Update semua field yang bisa diubah
 	updateData := map[string]interface{}{
 		"product_id":       product.ProductID,
@@ -96,7 +87,7 @@ func (r *ProductRepository) Update(ctx context.Context, product *domain.Product)
 		return fmt.Errorf("failed to update product: %w", result.Error)
 	}
 	if result.RowsAffected == 0 {
-		return errors.New("product not found or already deleted")
+		return errors.New("product not found")
 	}
 
 	return nil
@@ -112,7 +103,7 @@ func (r *ProductRepository) Delete(ctx context.Context, id uint64) error {
 		return fmt.Errorf("failed to delete product: %w", result.Error)
 	}
 	if result.RowsAffected == 0 {
-		return errors.New("product not found or already deleted")
+		return errors.New("product not found")
 	}
 
 	return nil

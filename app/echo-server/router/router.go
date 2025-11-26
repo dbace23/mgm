@@ -13,3 +13,12 @@ func SetupUserRoutes(api *echo.Group, handler *rest.UserHandler) {
 	users.POST("/register", handler.Register)
 	users.POST("/login", handler.Login)
 }
+
+func SetupProductRoutes(api *echo.Group, handler *rest.ProductHandler) {
+	products := api.Group("/products")
+
+	products.GET("", handler.GetAllProducts)
+	products.POST("", handler.CreateProduct)
+	products.PUT("/:id", handler.UpdateProduct)
+	products.DELETE("/:id", handler.DeleteProduct)
+}

@@ -48,10 +48,30 @@ func (s *productService) CreateProduct(ctx context.Context, product *domain.Prod
 		return nil, fmt.Errorf("context error: %w", err)
 	}
 
-	// Basic validation
+	// Validation
 	if product.ProductName == "" {
 		logger.Error("Invalid product data: product name is required")
 		return nil, errors.New("product name is required")
+	}
+
+	if product.ProductCategory == "" {
+		logger.Error("Invalid product data: product category is required")
+		return nil, errors.New("product category is required")
+	}
+
+	if product.Unit == "" {
+		logger.Error("Invalid product data: unit is required")
+		return nil, errors.New("unit is required")
+	}
+
+	if product.NormalPrice <= 0 {
+		logger.Error("Invalid product data: normal price must be greater than 0")
+		return nil, errors.New("normal price must be greater than 0")
+	}
+
+	if product.Quantity < 0 {
+		logger.Error("Invalid product data: quantity cannot be negative")
+		return nil, errors.New("quantity cannot be negative")
 	}
 
 	if err := s.productRepo.Create(ctx, product); err != nil {
@@ -75,6 +95,22 @@ func (s *productService) UpdateProduct(ctx context.Context, product *domain.Prod
 		return nil, errors.New("product ID is required")
 	}
 
+	// Validation
+	if product.ProductName == "" {
+		logger.Error("Invalid product data: product name is required")
+		return nil, errors.New("product name is required")
+	}
+
+	if product.NormalPrice <= 0 {
+		logger.Error("Invalid product data: normal price must be greater than 0")
+		return nil, errors.New("normal price must be greater than 0")
+	}
+
+	if product.Quantity < 0 {
+		logger.Error("Invalid product data: quantity cannot be negative")
+		return nil, errors.New("quantity cannot be negative")
+	}
+
 	// Verify product exists
 	_, err := s.productRepo.FindByID(ctx, product.ID)
 	if err != nil {
@@ -87,9 +123,16 @@ func (s *productService) UpdateProduct(ctx context.Context, product *domain.Prod
 		return nil, fmt.Errorf("failed to update product: %w", err)
 	}
 
+	// Get updated product from database
+	updatedProduct, err := s.productRepo.FindByID(ctx, product.ID)
+	if err != nil {
+		logger.Error("failed to fetch updated product", err)
+		return nil, fmt.Errorf("failed to fetch updated product: %w", err)
+	}
+
 	logger.Info("product updated success")
 
-	return product, nil
+	return &updatedProduct, nil
 }
 
 func (s *productService) DeleteProduct(ctx context.Context, id uint64) error {
