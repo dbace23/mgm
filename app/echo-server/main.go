@@ -81,6 +81,7 @@ func main() {
 	userHandler := rest.NewUserHandler(userService)
 	ordersHandler := rest.NewOrdersHandler(ordersService)
 	paymentsHandler := rest.NewPaymentsHandler(paymentsService)
+	webhookHandler := rest.NewWebhookController(paymentsService)
 
 	// Init echo
 	e := echo.New()
@@ -104,7 +105,7 @@ func main() {
 
 	// Setup routes
 	api := e.Group("/api/v1")
-	router.SetupUserRoutes(api, userHandler, ordersHandler, paymentsHandler)
+	router.SetupUserRoutes(api, userHandler, ordersHandler, paymentsHandler, webhookHandler)
 
 	// Goroutine server
 	go func() {
