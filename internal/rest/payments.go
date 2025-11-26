@@ -25,8 +25,8 @@ type (
 	}
 
 	PaymentsInput struct {
-		OrderID  int  `json:"order_id" validate:"required"`
-		IsWallet bool `json:"is_wallet" validate:"required"`
+		OrderID  int   `json:"order_id" validate:"required"`
+		IsWallet *bool `json:"is_wallet" validate:"required"`
 	}
 )
 
@@ -54,7 +54,7 @@ func (h *PaymentsHandler) CreatePayment(c echo.Context) error {
 
 	payment, err := h.paymentsService.CreatePayment(domain.Payments{
 		OrderID: request.OrderID,
-	}, request.IsWallet, user_id)
+	}, *request.IsWallet, user_id)
 	if err != nil {
 		logger.Error("Failed to create order items", err)
 		return c.JSON(http.StatusBadRequest, ResponseError{Message: err.Error()})

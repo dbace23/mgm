@@ -108,6 +108,27 @@ func (s *PaymentsService) UpdatePayment(data domain.Payments, user_id, productId
 
 			data.PaymentMethod = request.PaymentMethod
 			data.PaymentStatus = request.Status
+
+			order, err := s.orderRepo.GetOrder(data.OrderID)
+			if err != nil {
+				return err
+			}
+			err = s.orderRepo.UpdateOrder(domain.Orders{
+				ID:            order.ID,
+				UserID:        order.UserID,
+				ProductID:     order.ProductID,
+				Quantity:      order.Quantity,
+				PriceEach:     order.PriceEach,
+				Subtotal:      order.Subtotal,
+				OrderStatus:   "PAID",
+				PaymentMethod: request.PaymentMethod,
+				CreatedAt:     order.CreatedAt,
+				UpdatedAt:     time.Now(),
+			})
+			if err != nil {
+				return err
+			}
+
 		case "EXPIRED":
 			data.PaymentStatus = request.Status
 		}

@@ -51,7 +51,7 @@ func (r XenditRepository) XenditInvoiceUrl(purpose, username, email, name, categ
 		"currency": "IDR",
 		"items": [
 			{
-			"purpose": %s,
+			"purpose": "%s",
 			"name": "%s",
 			"quantity": %d,
 			"price": %.2f,
