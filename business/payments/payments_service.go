@@ -109,7 +109,11 @@ func (s *PaymentsService) UpdatePayment(data domain.Payments, user_id, productId
 			data.PaymentMethod = request.PaymentMethod
 			data.PaymentStatus = request.Status
 
-			order, err := s.orderRepo.GetOrder(data.OrderID)
+			payment, err := s.paymentRepo.GetPayment(data.ID)
+			if err != nil {
+				return err
+			}
+			order, err := s.orderRepo.GetOrder(payment.OrderID)
 			if err != nil {
 				return err
 			}
