@@ -56,9 +56,7 @@ type XenditConfig struct {
 }
 
 func Load() (*Config, error) {
-	if err := godotenv.Load(); err != nil {
-		return nil, errors.New("missing environment")
-	}
+	_ = godotenv.Load()
 
 	cfg := &Config{
 		App: AppConfig{

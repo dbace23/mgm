@@ -30,7 +30,7 @@ import (
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Printf("Failed to load config: %v", err)
+		log.Fatalf("Failed to load config: %v", err)
 	}
 
 	logger.Init(cfg.App.Environment)
