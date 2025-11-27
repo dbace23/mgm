@@ -67,7 +67,7 @@ func Load() (*Config, error) {
 			AppEmailVerificationKey: getEnv("APP_EMAIL_VERIFICATION_KEY", ""),
 		},
 		Server: ServerConfig{
-			Port: getEnv("SERVER_PORT", "8080"),
+			Port: getEnv("PORT", "8080"),
 		},
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
