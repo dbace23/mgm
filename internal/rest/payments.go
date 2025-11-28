@@ -120,3 +120,7 @@ func (h *PaymentsHandler) TopUp(c echo.Context) error {
 
 	return c.JSON(http.StatusCreated, fres.Response.StatusCreated(res))
 }
+
+func (h *PaymentsHandler) PaidResponse(c echo.Context) error {
+	return c.JSON(http.StatusOK, fres.Response.StatusOK("Your payment was successfull!"))
+}
