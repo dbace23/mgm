@@ -91,6 +91,7 @@ func (s *PaymentsService) CreatePayment(data domain.Payments, isWallet bool, use
 		}
 
 		order.OrderStatus = "PAID"
+		order.PaymentMethod = "WALLET"
 		order.UpdatedAt = time.Now()
 		err = s.orderRepo.UpdateOrder(order)
 		if err != nil {
