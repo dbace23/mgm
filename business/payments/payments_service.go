@@ -42,67 +42,131 @@ func NewPaymentsService(paymentRepo PaymentsRepository, xenditRepo *xendit.Xendi
 }
 
 func (s *PaymentsService) CreatePayment(data domain.Payments, isWallet bool, user_id uint) (domain.PaymentWithLink, error) {
-	existing, err := s.paymentRepo.GetPaymentByOrderID(*data.OrderID)
-	if err == nil && existing.PaymentStatus == "PENDING" {
-		return domain.PaymentWithLink{}, errors.New("pending payment already exists for this order")
+
+	if !isWallet && data.OrderID == nil {
+		return domain.PaymentWithLink{}, errors.New("order id is nil, please add order id")
 	}
 
 	if isWallet {
 		data.PaymentMethod = "WALLET"
-	}
-	data.PaymentStatus = "PENDING"
-	data.CreatedAt = time.Now()
-	data.PaymentType = "ORDER"
+		data.PaymentStatus = "PAID"
+		data.CreatedAt = time.Now()
+		data.PaymentType = "ORDER"
 
-	user, err := s.userRepo.FindByID(context.TODO(), user_id)
-	if err != nil {
-		return domain.PaymentWithLink{}, err
-	}
-	order, err := s.orderRepo.GetOrder(*data.OrderID, int(user_id))
-	if err != nil {
-		return domain.PaymentWithLink{}, err
-	}
-	if order.OrderStatus == "PAID" {
-		return domain.PaymentWithLink{}, errors.New("this order have already been paid")
-	}
+		user, err := s.userRepo.FindByID(context.TODO(), user_id)
+		if err != nil {
+			return domain.PaymentWithLink{}, err
+		}
+		order, err := s.orderRepo.GetOrder(*data.OrderID, int(user_id))
+		if err != nil {
+			return domain.PaymentWithLink{}, err
+		}
 
-	product, err := s.productRepo.FindByID(context.TODO(), uint64(order.ProductID))
-	if err != nil {
-		return domain.PaymentWithLink{}, err
-	}
-	if product.Quantity == 0 {
-		return domain.PaymentWithLink{}, errors.New("product stock is empty")
-	}
+		if user.Wallet < order.Subtotal {
+			return domain.PaymentWithLink{}, errors.New("insufficient wallet balance")
+		}
 
-	payment, err := s.paymentRepo.CreatePayment(data)
-	if err != nil {
-		return domain.PaymentWithLink{}, err
-	}
+		if order.OrderStatus == "PAID" {
+			return domain.PaymentWithLink{}, errors.New("this order have already been paid")
+		}
 
-	paymentLink, err := s.xenditRepo.XenditInvoiceUrl("TRANSFER", user.FullName, user.Email, product.ProductName, product.ProductCategory, int(user.ID), int(product.ID), order.Quantity, payment.ID, order.Subtotal, order.PriceEach)
-	if err != nil {
-		return domain.PaymentWithLink{}, err
-	}
+		product, err := s.productRepo.FindByID(context.TODO(), uint64(order.ProductID))
+		if err != nil {
+			return domain.PaymentWithLink{}, err
+		}
+		if product.Quantity == 0 {
+			return domain.PaymentWithLink{}, errors.New("product stock is empty")
+		}
 
-	order.OrderStatus = "AWAITING_PAYMENT"
-	order.UpdatedAt = time.Now()
-	err = s.orderRepo.UpdateOrder(order)
-	if err != nil {
-		return domain.PaymentWithLink{}, err
-	}
+		payment, err := s.paymentRepo.CreatePayment(data)
+		if err != nil {
+			return domain.PaymentWithLink{}, err
+		}
 
-	if paymentLink == "" {
-		return domain.PaymentWithLink{}, errors.New("payment link doesnt generated, please try again!")
-	}
+		user.Wallet -= order.Subtotal
 
-	return domain.PaymentWithLink{
-		ID:            payment.ID,
-		OrderID:       *payment.OrderID,
-		PaymentStatus: payment.PaymentStatus,
-		PaymentMethod: payment.PaymentMethod,
-		PaymentLink:   paymentLink,
-		CreatedAt:     payment.CreatedAt,
-	}, nil
+		err = s.userRepo.Update(context.TODO(), &user)
+		if err != nil {
+			return domain.PaymentWithLink{}, err
+		}
+
+		order.OrderStatus = "PAID"
+		order.UpdatedAt = time.Now()
+		err = s.orderRepo.UpdateOrder(order)
+		if err != nil {
+			return domain.PaymentWithLink{}, err
+		}
+
+		return domain.PaymentWithLink{
+			ID:            payment.ID,
+			UserID:        payment.UserID,
+			OrderID:       *payment.OrderID,
+			PaymentStatus: payment.PaymentStatus,
+			PaymentMethod: payment.PaymentMethod,
+			PaymentLink:   "",
+			CreatedAt:     payment.CreatedAt,
+		}, nil
+
+	} else {
+		existing, err := s.paymentRepo.GetPaymentByOrderID(*data.OrderID)
+		if err == nil && existing.PaymentStatus == "PENDING" {
+			return domain.PaymentWithLink{}, errors.New("pending payment already exists for this order")
+		}
+
+		data.PaymentStatus = "PENDING"
+		data.CreatedAt = time.Now()
+		data.PaymentType = "ORDER"
+
+		user, err := s.userRepo.FindByID(context.TODO(), user_id)
+		if err != nil {
+			return domain.PaymentWithLink{}, err
+		}
+		order, err := s.orderRepo.GetOrder(*data.OrderID, int(user_id))
+		if err != nil {
+			return domain.PaymentWithLink{}, err
+		}
+		if order.OrderStatus == "PAID" {
+			return domain.PaymentWithLink{}, errors.New("this order have already been paid")
+		}
+
+		product, err := s.productRepo.FindByID(context.TODO(), uint64(order.ProductID))
+		if err != nil {
+			return domain.PaymentWithLink{}, err
+		}
+		if product.Quantity == 0 {
+			return domain.PaymentWithLink{}, errors.New("product stock is empty")
+		}
+
+		payment, err := s.paymentRepo.CreatePayment(data)
+		if err != nil {
+			return domain.PaymentWithLink{}, err
+		}
+
+		paymentLink, err := s.xenditRepo.XenditInvoiceUrl("TRANSFER", user.FullName, user.Email, product.ProductName, product.ProductCategory, int(user.ID), int(product.ID), order.Quantity, payment.ID, order.Subtotal, order.PriceEach)
+		if err != nil {
+			return domain.PaymentWithLink{}, err
+		}
+
+		order.OrderStatus = "AWAITING_PAYMENT"
+		order.UpdatedAt = time.Now()
+		err = s.orderRepo.UpdateOrder(order)
+		if err != nil {
+			return domain.PaymentWithLink{}, err
+		}
+
+		if paymentLink == "" {
+			return domain.PaymentWithLink{}, errors.New("payment link doesnt generated, please try again!")
+		}
+		return domain.PaymentWithLink{
+			ID:            payment.ID,
+			UserID:        payment.UserID,
+			OrderID:       *payment.OrderID,
+			PaymentStatus: payment.PaymentStatus,
+			PaymentMethod: payment.PaymentMethod,
+			PaymentLink:   paymentLink,
+			CreatedAt:     payment.CreatedAt,
+		}, nil
+	}
 }
 func (s *PaymentsService) GetAllPayments(user_id int) ([]domain.Payments, error) {
 	return s.paymentRepo.GetAllPayments(user_id)
