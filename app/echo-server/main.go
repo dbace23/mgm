@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"myGreenMarket/app/echo-server/router"
+	"myGreenMarket/business/category"
 	"myGreenMarket/business/orders"
 	"myGreenMarket/business/payments"
 	"myGreenMarket/business/product"
@@ -72,12 +73,14 @@ func main() {
 	ordersRepo := psqlRepo.NewOrdersRepository(db)
 	productsRepo := psqlRepo.NewProductRepository(db)
 	paymentsRepo := psqlRepo.NewPaymentsRepository(db)
+	categoryRepo := psqlRepo.NewCategoryRepository(db)
 
 	// Init service
 	userService := userService.NewUserService(userRepo, validate, mailjetEmail, cfg.App.AppEmailVerificationKey, cfg.App.AppDeploymentUrl)
 	ordersService := orders.NewOrdersService(ordersRepo, productsRepo)
 	paymentsService := payments.NewPaymentsService(paymentsRepo, xenditRepo, userRepo, ordersRepo, productsRepo)
 	productService := product.NewProductService(productsRepo)
+	categoryService := category.NewCategoryService(categoryRepo)
 
 	// Init handler
 	userHandler := rest.NewUserHandler(userService)
@@ -85,6 +88,7 @@ func main() {
 	ordersHandler := rest.NewOrdersHandler(ordersService)
 	paymentsHandler := rest.NewPaymentsHandler(paymentsService)
 	webhookHandler := rest.NewWebhookController(paymentsService)
+	categoryHandler := rest.NewCategoryHandler(categoryService)
 
 	// Init echo
 	e := echo.New()
@@ -106,11 +110,15 @@ func main() {
 	authRequired := middleware.AuthMiddleware()
 	adminOnly := middleware.AdminOnly()
 
+	// authRequired := middleware.AuthMiddleware()
 	// Setup routes
 	api := e.Group("/api/v1")
 	router.SetupUserRoutes(api, userHandler)
 	router.SetupProductRoutes(api, productHandler, authRequired, adminOnly)
 	router.SetOrdersRoutes(api, ordersHandler)
+	router.SetPaymentsRoutes(api, paymentsHandler)
+	router.SetWebhookHandler(api, webhookHandler)
+	router.SetupCategoryRoutes(api, categoryHandler)
 	router.SetPaymentsRoutes(api, paymentsHandler)
 	router.SetWebhookHandler(api, webhookHandler)
 
