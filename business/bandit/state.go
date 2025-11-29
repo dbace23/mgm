@@ -1,12 +1,15 @@
 package bandit
 
-const linUCBFeatureDim = 4
+import "time"
+
+const linUCBFeatureDim = 6
 
 // Per arm/product LinUCB parameters.
 type LinUCBArmState struct {
-	A     [linUCBFeatureDim][linUCBFeatureDim]float64 `json:"A"`
-	B     [linUCBFeatureDim]float64                   `json:"b"`
-	Count int                                         `json:"count"`
+	A           [linUCBFeatureDim][linUCBFeatureDim]float64 `json:"A"`
+	B           [linUCBFeatureDim]float64                   `json:"b"`
+	Count       int                                         `json:"count"`
+	LastUpdated time.Time                                   `json:"last_updated"`
 }
 
 // Overall state for a slot.
@@ -15,22 +18,24 @@ type LinUCBState struct {
 	Arms  map[uint64]*LinUCBArmState `json:"arms"` // key: productID
 }
 
+// Create a new arm with A initialized to identity.
+func newArmState() *LinUCBArmState {
+	var A [linUCBFeatureDim][linUCBFeatureDim]float64
+	for i := 0; i < linUCBFeatureDim; i++ {
+		A[i][i] = 0.1 // 👈 smaller prior → higher initial uncertainty
+	}
+	return &LinUCBArmState{
+		A:           A,
+		B:           [linUCBFeatureDim]float64{},
+		Count:       0,
+		LastUpdated: time.Now(),
+	}
+}
+
 // Create a default state for a new slot.
 func newDefaultState() *LinUCBState {
 	return &LinUCBState{
 		Alpha: 1.0,
 		Arms:  make(map[uint64]*LinUCBArmState),
-	}
-}
-
-// Create a new arm with A initialized to identity.
-func newArmState() *LinUCBArmState {
-	var a [linUCBFeatureDim][linUCBFeatureDim]float64
-	for i := 0; i < linUCBFeatureDim; i++ {
-		a[i][i] = 1.0
-	}
-	return &LinUCBArmState{
-		A: a,
-		B: [linUCBFeatureDim]float64{},
 	}
 }

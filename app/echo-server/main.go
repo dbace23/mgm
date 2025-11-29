@@ -12,6 +12,7 @@ import (
 	userService "myGreenMarket/business/user"
 	"myGreenMarket/internal/middleware"
 	"myGreenMarket/internal/repository/notification"
+	"myGreenMarket/pkg/metrics"
 
 	psqlRepo "myGreenMarket/internal/repository/postgres"
 	"myGreenMarket/internal/repository/xendit"
@@ -26,15 +27,20 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	echomiddleware "github.com/labstack/echo/v4/middleware"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
+
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
+
+	metrics.Init()
 
 	logger.Init(cfg.App.Environment)
 	logger.Info("Starting MyGreenMarket", "version", cfg.App.Version)
@@ -76,16 +82,25 @@ func main() {
 	paymentsRepo := psqlRepo.NewPaymentsRepository(db)
 	banditRepo := psqlRepo.NewBanditRepository(db)
 	mockRecoRepo := psqlRepo.NewMockRecommendationRepository(db)
+	cfgRepo := psqlRepo.NewBanditConfigRepository(db)
+	segmentRepo := psqlRepo.NewUserSegmentRepository(db)
 
 	// Init service
 	userService := userService.NewUserService(userRepo, validate, mailjetEmail, cfg.App.AppEmailVerificationKey, cfg.App.AppDeploymentUrl)
 	ordersService := orders.NewOrdersService(ordersRepo, productsRepo)
 	paymentsService := payments.NewPaymentsService(paymentsRepo, xenditRepo, userRepo, ordersRepo, productsRepo)
+
+	eligChecker := bandit.NoopEligibilityChecker{}
+	defaultCfg := bandit.DefaultConfig()
 	banditService := bandit.NewBanditService(
-		banditRepo,   // BanditRepository (events)
+		banditRepo,   // BanditRepository (events + state)
 		productsRepo, // ProductRepository
 		banditRepo,   // BanditStateRepository (state)
-		mockRecoRepo, // OfflineRecommendationRepository (mock_recommendations)
+		eligChecker,  // EligibilityChecker
+		mockRecoRepo, // OfflineRecommendationRepository
+		cfgRepo,      // ConfigRepository
+		segmentRepo,  // SegmentRepository
+		defaultCfg,   // base Config
 	)
 	mockRecoService := mockreco.NewService(mockRecoRepo)
 
@@ -96,9 +111,28 @@ func main() {
 	webhookHandler := rest.NewWebhookController(paymentsService)
 	banditHandler := rest.NewBanditHandler(banditService)
 	mockRecoHandler := rest.NewMockRecommendationHandler(mockRecoService)
-
+	banditAdminHandler := rest.NewBanditAdminHandler(cfgRepo, segmentRepo)
 	// Init echo
 	e := echo.New()
+	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			req := c.Request()
+			ctx := req.Context()
+
+			traceID := req.Header.Get("X-Request-Id")
+			if traceID == "" {
+				traceID = uuid.NewString()
+			}
+
+			ctx = context.WithValue(ctx, bandit.TraceIDKey, traceID)
+			c.SetRequest(req.WithContext(ctx))
+
+			// optionally add to response header
+			c.Response().Header().Set("X-Request-Id", traceID)
+
+			return next(c)
+		}
+	})
 	e.HideBanner = true
 	e.HidePort = true
 
@@ -112,6 +146,7 @@ func main() {
 		AllowMethods: []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch},
 		AllowHeaders: []string{echo.HeaderOrigin, echo.HeaderContentType, echo.HeaderAccept, echo.HeaderAuthorization},
 	}))
+	e.GET("/metrics", echo.WrapHandler(promhttp.Handler()))
 
 	// Auth middleware
 	// authRequired := middleware.AuthMiddleware()
@@ -124,6 +159,7 @@ func main() {
 	router.SetPaymentsRoutes(api, paymentsHandler)
 	router.SetWebhookHandler(api, webhookHandler)
 	router.SetBanditRoutes(api, banditHandler)
+	router.SetBanditAdminRoutes(api, banditAdminHandler)
 	router.SetMockRecommendationRoutes(api, mockRecoHandler)
 
 	// Goroutine server

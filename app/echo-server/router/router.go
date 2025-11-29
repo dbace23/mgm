@@ -57,3 +57,13 @@ func SetMockRecommendationRoutes(api *echo.Group, h *rest.MockRecommendationHand
 	grp := api.Group("/mock-recommendations")
 	grp.GET("", h.Get)
 }
+
+func SetBanditAdminRoutes(api *echo.Group, handler *rest.BanditAdminHandler) {
+
+	admin := api.Group("/admin/bandit", middleware.AuthMiddleware())
+
+	admin.GET("/config", handler.GetConfig)
+	admin.PUT("/config", handler.UpsertConfig)
+	admin.GET("/segment", handler.GetSegment)
+	admin.PUT("/segment", handler.UpsertSegment)
+}
