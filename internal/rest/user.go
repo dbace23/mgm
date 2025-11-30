@@ -2,6 +2,7 @@ package rest
 
 import (
 	"context"
+	"fmt"
 	"myGreenMarket/domain"
 	"myGreenMarket/pkg/logger"
 	"net/http"
@@ -16,6 +17,10 @@ type UserService interface {
 	Register(ctx context.Context, user *domain.User) (domain.User, error)
 	Login(ctx context.Context, email, password string) (string, domain.User, error)
 	VerifyEmail(ctx context.Context, verificationCodeEncrypt string) (err error)
+	GetUserByID(ctx context.Context, id uint) (domain.User, error)
+	GetAllUsers(ctx context.Context) ([]domain.User, error)
+	UpdateUser(ctx context.Context, id uint, updateData *domain.User) (domain.User, error)
+	DeleteUser(ctx context.Context, id uint) error
 }
 
 type UserHandler struct {
@@ -41,6 +46,14 @@ type UserRegisterRequest struct {
 type UserLoginRequest struct {
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required"`
+}
+
+type UserUpdateRequest struct {
+	FullName string  `json:"full_name,omitempty"`
+	Email    string  `json:"email,omitempty" validate:"omitempty,email"`
+	Password string  `json:"password,omitempty" validate:"omitempty,min=6"`
+	Role     string  `json:"role,omitempty"`
+	Wallet   float64 `json:"wallet,omitempty"`
 }
 
 // ResponseError represent the response error struct
@@ -124,4 +137,126 @@ func (h *UserHandler) VerifyEmail(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, "Successfully verified email")
+}
+
+// GetUserByID handles getting a user by ID
+func (h *UserHandler) GetUserByID(c echo.Context) error {
+	id := c.Param("id")
+
+	// Convert string ID to uint
+	var userID uint
+	if _, err := fmt.Sscan(id, &userID); err != nil {
+		logger.Error("Invalid user ID", err)
+		return c.JSON(http.StatusBadRequest, ResponseError{Message: "invalid user ID"})
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request().Context(), h.timeout)
+	defer cancel()
+
+	user, err := h.userService.GetUserByID(ctx, userID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return c.JSON(http.StatusNotFound, ResponseError{Message: err.Error()})
+		}
+		return c.JSON(http.StatusInternalServerError, ResponseError{Message: err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"message": "User retrieved successfully",
+		"user":    user,
+	})
+}
+
+// GetAllUsers handles getting all users
+func (h *UserHandler) GetAllUsers(c echo.Context) error {
+	ctx, cancel := context.WithTimeout(c.Request().Context(), h.timeout)
+	defer cancel()
+
+	users, err := h.userService.GetAllUsers(ctx)
+	if err != nil {
+		logger.Error("Failed to get all users", err)
+		return c.JSON(http.StatusInternalServerError, ResponseError{Message: err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"message": "Users retrieved successfully",
+		"users":   users,
+	})
+}
+
+// UpdateUser handles updating a user
+func (h *UserHandler) UpdateUser(c echo.Context) error {
+	id := c.Param("id")
+
+	// Convert string ID to uint
+	var userID uint
+	if _, err := fmt.Sscan(id, &userID); err != nil {
+		logger.Error("Invalid user ID", err)
+		return c.JSON(http.StatusBadRequest, ResponseError{Message: "invalid user ID"})
+	}
+
+	var reqUpdate UserUpdateRequest
+	if err := c.Bind(&reqUpdate); err != nil {
+		logger.Error("Invalid request body", err)
+		return c.JSON(http.StatusBadRequest, ResponseError{Message: err.Error()})
+	}
+
+	if err := h.validator.Struct(&reqUpdate); err != nil {
+		logger.Error("Failed to validate user update", err)
+		return c.JSON(http.StatusBadRequest, ResponseError{Message: err.Error()})
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request().Context(), h.timeout)
+	defer cancel()
+
+	updateData := &domain.User{
+		FullName: reqUpdate.FullName,
+		Email:    reqUpdate.Email,
+		Password: reqUpdate.Password,
+		Role:     reqUpdate.Role,
+		Wallet:   reqUpdate.Wallet,
+	}
+
+	updatedUser, err := h.userService.UpdateUser(ctx, userID, updateData)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return c.JSON(http.StatusNotFound, ResponseError{Message: err.Error()})
+		}
+		if strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "invalid") {
+			return c.JSON(http.StatusBadRequest, ResponseError{Message: err.Error()})
+		}
+		return c.JSON(http.StatusInternalServerError, ResponseError{Message: err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"message": "User updated successfully",
+		"user":    updatedUser,
+	})
+}
+
+// DeleteUser handles deleting a user
+func (h *UserHandler) DeleteUser(c echo.Context) error {
+	id := c.Param("id")
+
+	// Convert string ID to uint
+	var userID uint
+	if _, err := fmt.Sscan(id, &userID); err != nil {
+		logger.Error("Invalid user ID", err)
+		return c.JSON(http.StatusBadRequest, ResponseError{Message: "invalid user ID"})
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request().Context(), h.timeout)
+	defer cancel()
+
+	err := h.userService.DeleteUser(ctx, userID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return c.JSON(http.StatusNotFound, ResponseError{Message: err.Error()})
+		}
+		return c.JSON(http.StatusInternalServerError, ResponseError{Message: err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"message": "User deleted successfully",
+	})
 }

@@ -163,7 +163,7 @@ func main() {
 	// authRequired := middleware.AuthMiddleware()
 	// Setup routes
 	api := e.Group("/api/v1")
-	router.SetupUserRoutes(api, userHandler)
+	router.SetupUserRoutes(api, userHandler, authRequired, adminOnly)
 	router.SetupProductRoutes(api, productHandler, authRequired, adminOnly)
 	router.SetOrdersRoutes(api, ordersHandler)
 	router.SetPaymentsRoutes(api, paymentsHandler)
