@@ -195,3 +195,109 @@ func (s *userService) VerifyEmail(ctx context.Context, verificationCodeEncrypt s
 
 	return nil
 }
+
+// GetUserByID retrieves a user by ID
+func (s *userService) GetUserByID(ctx context.Context, id uint) (domain.User, error) {
+	user, err := s.userRepo.FindByID(ctx, id)
+	if err != nil {
+		logger.Error("Failed to get user by ID", err)
+		return domain.User{}, err
+	}
+
+	user.Password = ""
+	return user, nil
+}
+
+// GetAllUsers retrieves all users
+func (s *userService) GetAllUsers(ctx context.Context) ([]domain.User, error) {
+	users, err := s.userRepo.FindAll(ctx)
+	if err != nil {
+		logger.Error("Failed to get all users", err)
+		return nil, err
+	}
+
+	for i := range users {
+		users[i].Password = ""
+	}
+
+	return users, nil
+}
+
+// UpdateUser updates user information
+func (s *userService) UpdateUser(ctx context.Context, id uint, updateData *domain.User) (domain.User, error) {
+	existingUser, err := s.userRepo.FindByID(ctx, id)
+	if err != nil {
+		logger.Error("User not found for update", err)
+		return domain.User{}, err
+	}
+
+	if updateData.FullName != "" {
+		existingUser.FullName = updateData.FullName
+	}
+
+	if updateData.Email != "" {
+		// Validate email format
+		if err := s.validate.Var(updateData.Email, "required,email"); err != nil {
+			logger.Error("Invalid email format", err)
+			return domain.User{}, errors.New("invalid email format")
+		}
+
+		// Check if email already exists (excluding current user)
+		userWithEmail, err := s.userRepo.FindByEmail(ctx, updateData.Email)
+		if err == nil && userWithEmail.ID != id {
+			logger.Error("Email already exists")
+			return domain.User{}, errors.New("email already exists")
+		}
+		existingUser.Email = updateData.Email
+	}
+
+	if updateData.Password != "" {
+		// Validate password
+		if err := s.validate.Var(updateData.Password, "required,min=6"); err != nil {
+			logger.Error("Invalid password", err)
+			return domain.User{}, errors.New("password must be at least 6 characters")
+		}
+
+		// Hash new password
+		passwordHash, err := utils.HashPassword(updateData.Password)
+		if err != nil {
+			logger.Error("Failed to hash password", err)
+			return domain.User{}, errors.New("failed to hash password")
+		}
+		existingUser.Password = string(passwordHash)
+	}
+
+	if updateData.Role != "" {
+		existingUser.Role = updateData.Role
+	}
+
+	if updateData.Wallet >= 0 {
+		existingUser.Wallet = updateData.Wallet
+	}
+
+	// Update in database
+	if err := s.userRepo.Update(ctx, &existingUser); err != nil {
+		logger.Error("Failed to update user", err)
+		return domain.User{}, err
+	}
+
+	existingUser.Password = ""
+	return existingUser, nil
+}
+
+// DeleteUser soft deletes a user
+func (s *userService) DeleteUser(ctx context.Context, id uint) error {
+	_, err := s.userRepo.FindByID(ctx, id)
+	if err != nil {
+		logger.Error("User not found for deletion", err)
+		return err
+	}
+
+	// Delete user
+	if err := s.userRepo.Delete(ctx, id); err != nil {
+		logger.Error("Failed to delete user", err)
+		return err
+	}
+
+	return nil
+}

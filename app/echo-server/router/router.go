@@ -7,12 +7,17 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func SetupUserRoutes(api *echo.Group, handler *rest.UserHandler) {
+func SetupUserRoutes(api *echo.Group, handler *rest.UserHandler, authRequired echo.MiddlewareFunc, adminOnly echo.MiddlewareFunc) {
 	users := api.Group("/users")
 
 	users.GET("/email-verification/:code", handler.VerifyEmail)
 	users.POST("/register", handler.Register)
 	users.POST("/login", handler.Login)
+
+	users.PUT("/:id", handler.UpdateUser, authRequired)
+	users.GET("", handler.GetAllUsers, authRequired, adminOnly)
+	users.GET("/:id", handler.GetUserByID, authRequired, adminOnly)
+	users.DELETE("/:id", handler.DeleteUser, authRequired, adminOnly)
 }
 
 func SetupProductRoutes(api *echo.Group, handler *rest.ProductHandler, authRequired echo.MiddlewareFunc, adminOnly echo.MiddlewareFunc) {

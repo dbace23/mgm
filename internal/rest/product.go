@@ -14,6 +14,7 @@ import (
 
 type ProductService interface {
 	GetAllProducts(ctx context.Context) ([]domain.Product, error)
+	GetAllProductsWithPagination(ctx context.Context, page, limit int) ([]domain.Product, int64, error)
 	GetProductByID(ctx context.Context, id uint) (*domain.Product, error)
 	CreateProduct(ctx context.Context, product *domain.Product) (*domain.Product, error)
 	UpdateProduct(ctx context.Context, product *domain.Product) (*domain.Product, error)
@@ -63,18 +64,47 @@ type UpdateProductRequest struct {
 }
 
 func (h *ProductHandler) GetAllProducts(c echo.Context) error {
+	// Get pagination parameters from query string
+	pageStr := c.QueryParam("page")
+	limitStr := c.QueryParam("limit")
+
+	// Default values
+	page := 1
+	limit := 30
+
+	// Parse page
+	if pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			page = p
+		}
+	}
+
+	// Parse limit
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
+			limit = l
+		}
+	}
+
 	ctx, cancel := context.WithTimeout(c.Request().Context(), h.timeout)
 	defer cancel()
 
-	products, err := h.productService.GetAllProducts(ctx)
+	products, totalCount, err := h.productService.GetAllProductsWithPagination(ctx, page, limit)
 	if err != nil {
 		logger.Error("Failed to find all Product", err)
 		return c.JSON(http.StatusInternalServerError, ResponseError{Message: err.Error()})
 	}
 
+	// Calculate total pages
+	totalPages := int((totalCount + int64(limit) - 1) / int64(limit))
+
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"message":  "successfully get all products",
-		"products": products,
+		"message":     "successfully get all products",
+		"products":    products,
+		"page":        page,
+		"limit":       limit,
+		"total_items": totalCount,
+		"total_pages": totalPages,
 	})
 }
 
