@@ -17,13 +17,20 @@ type ProductRepository interface {
 	Delete(ctx context.Context, id uint64) error
 }
 
-type productService struct {
-	productRepo ProductRepository
+// CategoryRepository contract interface
+type CategoryRepository interface {
+	FindByID(ctx context.Context, id uint64) (domain.Category, error)
 }
 
-func NewProductService(productRepo ProductRepository) *productService {
+type productService struct {
+	productRepo  ProductRepository
+	categoryRepo CategoryRepository
+}
+
+func NewProductService(productRepo ProductRepository, categoryRepo CategoryRepository) *productService {
 	return &productService{
-		productRepo: productRepo,
+		productRepo:  productRepo,
+		categoryRepo: categoryRepo,
 	}
 }
 
@@ -74,6 +81,15 @@ func (s *productService) CreateProduct(ctx context.Context, product *domain.Prod
 		return nil, errors.New("quantity cannot be negative")
 	}
 
+	// Validate category exists if category_id is provided
+	if product.CategoryID != nil && *product.CategoryID > 0 {
+		_, err := s.categoryRepo.FindByID(ctx, *product.CategoryID)
+		if err != nil {
+			logger.Error("category not found", err)
+			return nil, errors.New("category not found")
+		}
+	}
+
 	if err := s.productRepo.Create(ctx, product); err != nil {
 		logger.Error("failed to create new product", err)
 		return nil, fmt.Errorf("failed to create product: %w", err)
@@ -109,6 +125,15 @@ func (s *productService) UpdateProduct(ctx context.Context, product *domain.Prod
 	if product.Quantity < 0 {
 		logger.Error("Invalid product data: quantity cannot be negative")
 		return nil, errors.New("quantity cannot be negative")
+	}
+
+	// Validate category exists if category_id is provided
+	if product.CategoryID != nil && *product.CategoryID > 0 {
+		_, err := s.categoryRepo.FindByID(ctx, *product.CategoryID)
+		if err != nil {
+			logger.Error("category not found", err)
+			return nil, errors.New("category not found")
+		}
 	}
 
 	// Verify product exists

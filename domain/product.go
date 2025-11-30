@@ -26,6 +26,7 @@ type Product struct {
 	IsGreenTag      bool      `gorm:"column:is_green_tag;default:false"`
 	ProductName     string    `gorm:"column:product_name;type:text"`
 	ProductCategory string    `gorm:"column:product_category;type:text"`
+	CategoryID      *uint64   `gorm:"column:category_id"`
 	Unit            string    `gorm:"column:unit;type:text"`
 	NormalPrice     float64   `gorm:"column:normal_price;type:numeric"`
 	SalePrice       float64   `gorm:"column:sale_price;type:numeric"`

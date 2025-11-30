@@ -39,6 +39,7 @@ type CreateProductRequest struct {
 	IsGreenTag      bool    `json:"is_green_tag"`
 	ProductName     string  `json:"product_name" validate:"required"`
 	ProductCategory string  `json:"product_category" validate:"required"`
+	CategoryID      *uint64 `json:"category_id"`
 	Unit            string  `json:"unit" validate:"required"`
 	NormalPrice     float64 `json:"normal_price" validate:"required,gt=0"`
 	SalePrice       float64 `json:"sale_price" validate:"gte=0"`
@@ -52,6 +53,7 @@ type UpdateProductRequest struct {
 	IsGreenTag      bool    `json:"is_green_tag"`
 	ProductName     string  `json:"product_name" validate:"required"`
 	ProductCategory string  `json:"product_category" validate:"required"`
+	CategoryID      *uint64 `json:"category_id"`
 	Unit            string  `json:"unit" validate:"required"`
 	NormalPrice     float64 `json:"normal_price" validate:"required,gt=0"`
 	SalePrice       float64 `json:"sale_price" validate:"gte=0"`
@@ -97,6 +99,7 @@ func (h *ProductHandler) CreateProduct(c echo.Context) error {
 		IsGreenTag:      req.IsGreenTag,
 		ProductName:     req.ProductName,
 		ProductCategory: req.ProductCategory,
+		CategoryID:      req.CategoryID,
 		Unit:            req.Unit,
 		NormalPrice:     req.NormalPrice,
 		SalePrice:       req.SalePrice,
@@ -107,6 +110,10 @@ func (h *ProductHandler) CreateProduct(c echo.Context) error {
 	newProduct, err := h.productService.CreateProduct(ctx, product)
 	if err != nil {
 		logger.Error("Failed to create Product", err)
+		// Check if category not found
+		if err.Error() == "category not found" {
+			return c.JSON(http.StatusNotFound, ResponseError{Message: err.Error()})
+		}
 		// Check if it's a validation error
 		if err.Error() == "product name is required" ||
 			err.Error() == "product category is required" ||
@@ -154,6 +161,7 @@ func (h *ProductHandler) UpdateProduct(c echo.Context) error {
 		IsGreenTag:      req.IsGreenTag,
 		ProductName:     req.ProductName,
 		ProductCategory: req.ProductCategory,
+		CategoryID:      req.CategoryID,
 		Unit:            req.Unit,
 		NormalPrice:     req.NormalPrice,
 		SalePrice:       req.SalePrice,
@@ -164,8 +172,8 @@ func (h *ProductHandler) UpdateProduct(c echo.Context) error {
 	updateProduct, err := h.productService.UpdateProduct(ctx, product)
 	if err != nil {
 		logger.Error("Failed to update Product", err)
-		// Check if product not found
-		if err.Error() == "product not found" {
+		// Check if product or category not found
+		if err.Error() == "product not found" || err.Error() == "category not found" {
 			return c.JSON(http.StatusNotFound, ResponseError{Message: err.Error()})
 		}
 		// Check if it's a validation error

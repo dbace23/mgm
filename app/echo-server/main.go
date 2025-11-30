@@ -8,6 +8,7 @@ import (
 	"myGreenMarket/business/category"
 	"myGreenMarket/business/orders"
 	"myGreenMarket/business/payments"
+	"myGreenMarket/business/product"
 	userService "myGreenMarket/business/user"
 	"myGreenMarket/internal/middleware"
 	"myGreenMarket/internal/repository/notification"
@@ -76,12 +77,14 @@ func main() {
 
 	// Init service
 	userService := userService.NewUserService(userRepo, validate, mailjetEmail, cfg.App.AppEmailVerificationKey, cfg.App.AppDeploymentUrl)
+	productService := product.NewProductService(productsRepo, categoryRepo)
 	ordersService := orders.NewOrdersService(ordersRepo, productsRepo)
 	paymentsService := payments.NewPaymentsService(paymentsRepo, xenditRepo, userRepo, ordersRepo, productsRepo)
 	categoryService := category.NewCategoryService(categoryRepo)
 
 	// Init handler
 	userHandler := rest.NewUserHandler(userService)
+	productHandler := rest.NewProductHandler(productService)
 	ordersHandler := rest.NewOrdersHandler(ordersService)
 	paymentsHandler := rest.NewPaymentsHandler(paymentsService)
 	webhookHandler := rest.NewWebhookController(paymentsService)
@@ -108,12 +111,11 @@ func main() {
 	// Setup routes
 	api := e.Group("/api/v1")
 	router.SetupUserRoutes(api, userHandler)
+	router.SetupProductRoutes(api, productHandler)
 	router.SetOrdersRoutes(api, ordersHandler)
 	router.SetPaymentsRoutes(api, paymentsHandler)
 	router.SetWebhookHandler(api, webhookHandler)
 	router.SetupCategoryRoutes(api, categoryHandler)
-	router.SetPaymentsRoutes(api, paymentsHandler)
-	router.SetWebhookHandler(api, webhookHandler)
 
 	// Goroutine server
 	go func() {

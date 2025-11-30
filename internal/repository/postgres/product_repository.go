@@ -75,6 +75,7 @@ func (r *ProductRepository) Update(ctx context.Context, product *domain.Product)
 		"is_green_tag":     product.IsGreenTag,
 		"product_name":     product.ProductName,
 		"product_category": product.ProductCategory,
+		"category_id":      product.CategoryID,
 		"unit":             product.Unit,
 		"normal_price":     product.NormalPrice,
 		"sale_price":       product.SalePrice,
