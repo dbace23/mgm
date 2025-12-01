@@ -98,6 +98,12 @@ func (s *PaymentsService) CreatePayment(data domain.Payments, isWallet bool, use
 			return domain.PaymentWithLink{}, err
 		}
 
+		product.Quantity -= float64(order.Quantity)
+		err = s.productRepo.Update(context.TODO(), &product)
+		if err != nil {
+			return domain.PaymentWithLink{}, err
+		}
+
 		return domain.PaymentWithLink{
 			ID:            payment.ID,
 			UserID:        payment.UserID,
@@ -215,54 +221,24 @@ func (s *PaymentsService) ReceivePaymentWebhook(request rest.WebhookRequest) err
 				return errors.New("insufficient stock")
 			}
 
-			err = s.orderRepo.UpdateOrder(domain.Orders{
-				ID:            order.ID,
-				UserID:        order.UserID,
-				ProductID:     order.ProductID,
-				Quantity:      order.Quantity,
-				PriceEach:     order.PriceEach,
-				Subtotal:      order.Subtotal,
-				OrderStatus:   "PAID",
-				PaymentMethod: request.PaymentMethod,
-				CreatedAt:     order.CreatedAt,
-				UpdatedAt:     time.Now(),
-			})
+			order.OrderStatus = "PAID"
+			order.UpdatedAt = time.Now()
+			err = s.orderRepo.UpdateOrder(order)
 			if err != nil {
 				return err
 			}
 
-			err = s.productRepo.Update(context.TODO(), &domain.Product{
-				ID:              product.ID,
-				ProductID:       product.ProductID,
-				ProductSKUID:    product.ProductSKUID,
-				IsGreenTag:      product.IsGreenTag,
-				ProductName:     product.ProductName,
-				ProductCategory: product.ProductCategory,
-				Unit:            product.Unit,
-				NormalPrice:     product.NormalPrice,
-				SalePrice:       product.SalePrice,
-				Discount:        product.Discount,
-				Quantity:        product.Quantity - float64(request.Items[0].Quantity),
-				CreatedAt:       product.CreatedAt,
-			})
+			product.Quantity = product.Quantity - float64(request.Items[0].Quantity)
+			err = s.productRepo.Update(context.TODO(), &product)
 			if err != nil {
 				return err
 			}
 
 			errUpdate = s.paymentRepo.UpdatePayment(payment)
 		case "EXPIRED":
-			err = s.orderRepo.UpdateOrder(domain.Orders{
-				ID:            order.ID,
-				UserID:        order.UserID,
-				ProductID:     order.ProductID,
-				Quantity:      order.Quantity,
-				PriceEach:     order.PriceEach,
-				Subtotal:      order.Subtotal,
-				OrderStatus:   "PENDING",
-				PaymentMethod: request.PaymentMethod,
-				CreatedAt:     order.CreatedAt,
-				UpdatedAt:     time.Now(),
-			})
+			order.OrderStatus = "PENDING"
+			order.UpdatedAt = time.Now()
+			err = s.orderRepo.UpdateOrder(order)
 			if err != nil {
 				return err
 			}

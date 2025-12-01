@@ -1,7 +1,6 @@
 package rest
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -64,15 +63,11 @@ func (ctrl WebhookHandler) HandleWebhook(c echo.Context) error {
 	var request WebhookRequest
 
 	receivedToken := c.Request().Header.Get("x-callback-token")
-	fmt.Println("---------------------------------Webhook Header-----------------------------------------------------")
-	log.Print(ctrl.xenditWebhookVerificationToken)
-	log.Print(receivedToken)
-	if ctrl.xenditWebhookVerificationToken == receivedToken {
-		log.Print("Yeah the xendit token is correct")
-	} else {
-		log.Print("No, the xendit token is not correct")
+
+	if receivedToken != ctrl.xenditWebhookVerificationToken {
+		return c.JSON(http.StatusUnauthorized, fres.Response.StatusUnauthorized("Invalid callback token"))
 	}
-	fmt.Println("---------------------------------Webhook Header-----------------------------------------------------")
+
 	if err := c.Bind(&request); err != nil {
 		log.Println("Failed to bind webhook request:", err)
 		return c.JSON(http.StatusBadRequest, fres.Response.StatusBadRequest("Invalid request"))
