@@ -15,7 +15,10 @@ import (
 
 type UserService interface {
 	Register(ctx context.Context, user *domain.User) (domain.User, error)
-	Login(ctx context.Context, email, password string) (string, domain.User, error)
+	Login(ctx context.Context, email, password, ipAddress, userAgent string) (string, domain.User, error)
+	ValidateTokenFromRedis(ctx context.Context, token string) (string, error)
+	RefreshToken(ctx context.Context, oldToken, ipAddress, userAgent string) (string, domain.User, error)
+	Logout(ctx context.Context, userID uint, token string) error
 	VerifyEmail(ctx context.Context, verificationCodeEncrypt string) (err error)
 	GetUserByID(ctx context.Context, id uint) (domain.User, error)
 	GetAllUsers(ctx context.Context) ([]domain.User, error)
@@ -54,6 +57,10 @@ type UserUpdateRequest struct {
 	Password string  `json:"password,omitempty" validate:"omitempty,min=6"`
 	Role     string  `json:"role,omitempty"`
 	Wallet   float64 `json:"wallet,omitempty"`
+}
+
+type RefreshTokenRequest struct {
+	Token string `json:"token" validate:"required"`
 }
 
 // ResponseError represent the response error struct
@@ -109,7 +116,11 @@ func (h *UserHandler) Login(c echo.Context) error {
 	ctx, cancel := context.WithTimeout(c.Request().Context(), h.timeout)
 	defer cancel()
 
-	token, user, err := h.userService.Login(ctx, reqUser.Email, reqUser.Password)
+	// get ip address and user agent
+	ipAddress := c.RealIP()
+	userAgent := c.Request().UserAgent()
+
+	token, user, err := h.userService.Login(ctx, reqUser.Email, reqUser.Password, ipAddress, userAgent)
 	if err != nil {
 		logger.Error("Failed to login with user", err)
 		return c.JSON(http.StatusUnauthorized, ResponseError{Message: err.Error()})
@@ -118,6 +129,70 @@ func (h *UserHandler) Login(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"message": "Login successful",
 		"token":   token,
+		"user":    user,
+	})
+}
+
+// Logout handles user logout by invalidating token
+func (h *UserHandler) Logout(c echo.Context) error {
+	ctx, cancel := context.WithTimeout(c.Request().Context(), h.timeout)
+	defer cancel()
+
+	// Get user_id from context (set by auth middleware)
+	userID, ok := c.Get("user_id").(uint)
+	if !ok {
+		logger.Error("Failed to get user_id from context")
+		return c.JSON(http.StatusUnauthorized, ResponseError{Message: "unauthorized"})
+	}
+
+	// Get token from context (set by auth middleware)
+	token, ok := c.Get("token").(string)
+	if !ok {
+		logger.Error("Failed to get token from context")
+		return c.JSON(http.StatusUnauthorized, ResponseError{Message: "unauthorized"})
+	}
+
+	err := h.userService.Logout(ctx, userID, token)
+	if err != nil {
+		logger.Error("Failed to logout user", err)
+		return c.JSON(http.StatusInternalServerError, ResponseError{Message: err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"message": "Logout successful",
+	})
+}
+
+// RefreshToken used for refresh user token
+func (h *UserHandler) RefreshToken(c echo.Context) error {
+	var req RefreshTokenRequest
+
+	if err := c.Bind(&req); err != nil {
+		logger.Error("Invalid request body", err)
+		return c.JSON(http.StatusBadRequest, ResponseError{Message: err.Error()})
+	}
+
+	if err := h.validator.Struct(&req); err != nil {
+		logger.Error("Failed to validate refresh token request", err)
+		return c.JSON(http.StatusBadRequest, ResponseError{Message: err.Error()})
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request().Context(), h.timeout)
+	defer cancel()
+
+	// get ip address and user agent
+	ipAddress := c.RealIP()
+	userAgent := c.Request().UserAgent()
+
+	newToken, user, err := h.userService.RefreshToken(ctx, req.Token, ipAddress, userAgent)
+	if err != nil {
+		logger.Error("Failed to refresh token", err)
+		return c.JSON(http.StatusUnauthorized, ResponseError{Message: err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"message": "Token refreshed successfully",
+		"token":   newToken,
 		"user":    user,
 	})
 }

@@ -124,3 +124,44 @@ func (r *TokenRepository) RefreshTokenTTL(ctx context.Context, userID string, ne
 
 	return nil
 }
+
+// DeleteToken removes token from redis
+func (r *TokenRepository) DeleteToken(ctx context.Context, userID, token string) error {
+	key := fmt.Sprintf("token:user:%s", userID)
+	tokenKey := fmt.Sprintf("token:lookup:%s", token)
+
+	pipe := r.client.Pipeline()
+	pipe.Del(ctx, key)
+	pipe.Del(ctx, tokenKey)
+
+	_, err := pipe.Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to delete token: %w", err)
+	}
+
+	return nil
+}
+
+// BlaclistToken adds a token to blacklist
+func (r *TokenRepository) BlaclistToken(ctx context.Context, token string, ttl time.Duration) error {
+	key := fmt.Sprintf("token:blacklist:%s", token)
+
+	err := r.client.Set(ctx, key, "1", ttl).Err()
+	if err != nil {
+		return fmt.Errorf("failed to blacklist token: %w", err)
+	}
+
+	return nil
+}
+
+// IsTokenBlacklisted checks if a token is in the blacklist
+func (r *TokenRepository) IsTokenBlacklisted(ctx context.Context, token string) (bool, error) {
+	key := fmt.Sprintf("token:blacklist:%s", token)
+
+	exists, err := r.client.Exists(ctx, key).Result()
+	if err != nil {
+		return false, fmt.Errorf("failed to check blacklist: %w", err)
+	}
+
+	return exists > 0, nil
+}
