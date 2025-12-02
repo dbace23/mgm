@@ -10,13 +10,19 @@ import (
 func SetupUserRoutes(api *echo.Group, handler *rest.UserHandler, authRequired echo.MiddlewareFunc, adminOnly echo.MiddlewareFunc) {
 	users := api.Group("/users")
 
+	// Public routes
 	users.GET("/email-verification/:code", handler.VerifyEmail)
 	users.POST("/register", handler.Register)
 	users.POST("/login", handler.Login)
 
-	users.PUT("/:id", handler.UpdateUser, authRequired)
-	users.GET("", handler.GetAllUsers, authRequired, adminOnly)
-	users.GET("/:id", handler.GetUserByID, authRequired, adminOnly)
+	// Protected routes - require authentication
+	users.POST("/logout", handler.Logout, authRequired)
+	users.POST("/refresh", handler.RefreshToken, authRequired)
+	users.GET("", handler.GetAllUsers, authRequired)
+	users.GET("/:id", handler.GetUserByID, authRequired)
+
+	// Admin only routes
+	users.PUT("/:id", handler.UpdateUser, authRequired, adminOnly)
 	users.DELETE("/:id", handler.DeleteUser, authRequired, adminOnly)
 }
 

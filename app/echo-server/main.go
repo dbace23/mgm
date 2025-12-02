@@ -14,6 +14,8 @@ import (
 	userService "myGreenMarket/business/user"
 	"myGreenMarket/internal/middleware"
 	"myGreenMarket/internal/repository/notification"
+	redisRepo "myGreenMarket/internal/repository/redis"
+	"myGreenMarket/pkg/database/redis"
 	"myGreenMarket/pkg/metrics"
 
 	psqlRepo "myGreenMarket/internal/repository/postgres"
@@ -51,8 +53,15 @@ func main() {
 	if err != nil {
 		logger.Fatal("Failed to connect to database", "error", err)
 	}
-
 	logger.Info("Database connected successfully")
+
+	// init redis
+	redisClient, err := redis.NewRedisClient(cfg)
+	if err != nil {
+		log.Fatalf("Failed to connect to Redis: %v", err)
+	}
+	defer redis.CloseRedisClient(redisClient)
+	logger.Info("Successfully connected to Redis")
 
 	// Init notification from mailjet
 	mailjetEmail := notification.NewMailjetRepository(
@@ -79,6 +88,7 @@ func main() {
 
 	// Init repo
 	userRepo := psqlRepo.NewUserRepository(db)
+	tokenRepo := redisRepo.NewTokenRepository(redisClient)
 	ordersRepo := psqlRepo.NewOrdersRepository(db)
 	productsRepo := psqlRepo.NewProductRepository(db)
 	paymentsRepo := psqlRepo.NewPaymentsRepository(db)
@@ -89,7 +99,7 @@ func main() {
 	categoryRepo := psqlRepo.NewCategoryRepository(db)
 
 	// Init service
-	userService := userService.NewUserService(userRepo, validate, mailjetEmail, cfg.App.AppEmailVerificationKey, cfg.App.AppDeploymentUrl)
+	userService := userService.NewUserService(userRepo, tokenRepo, validate, mailjetEmail, cfg.App.AppEmailVerificationKey, cfg.App.AppDeploymentUrl)
 	ordersService := orders.NewOrdersService(ordersRepo, productsRepo)
 	paymentsService := payments.NewPaymentsService(paymentsRepo, xenditRepo, userRepo, ordersRepo, productsRepo)
 	productService := product.NewProductService(productsRepo)
@@ -160,10 +170,12 @@ func main() {
 	authRequired := middleware.AuthMiddleware()
 	adminOnly := middleware.AdminOnly()
 
-	// authRequired := middleware.AuthMiddleware()
+	// Redis-based auth middleware (untuk route yang memerlukan validasi Redis)
+	authWithRedis := middleware.AuthMiddlewareWithRedis(userService)
+
 	// Setup routes
 	api := e.Group("/api/v1")
-	router.SetupUserRoutes(api, userHandler, authRequired, adminOnly)
+	router.SetupUserRoutes(api, userHandler, authWithRedis, adminOnly)
 	router.SetupProductRoutes(api, productHandler, authRequired, adminOnly)
 	router.SetOrdersRoutes(api, ordersHandler)
 	router.SetPaymentsRoutes(api, paymentsHandler)
