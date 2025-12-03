@@ -294,11 +294,17 @@ Base path: `/api/v1`
 
 ### Users
 
-| Method | Path                                  | Description                | Auth |
-|--------|---------------------------------------|----------------------------|------|
-| POST   | `/users/register`                     | Register new user          | No   |
-| GET    | `/users/email-verification/:code`     | Verify email code          | No   |
-| POST   | `/users/login`                        | Login, returns JWT token   | No   |
+| Method | Path                                  | Description                                | Auth              |
+|--------|---------------------------------------|--------------------------------------------|-------------------|
+| POST   | `/users/register`                     | Register new user                          | No                |
+| GET    | `/users/email-verification/:code`     | Verify email code                          | No                |
+| POST   | `/users/login`                        | Login, returns JWT token                   | No                |
+| POST   | `/users/logout`                       | Logout account, blacklisting token         | Yes               |
+| POST   | `/users/refresh`                      | Refreshing JWT token, return new JWT token | Yes               |
+| GET    | `/users/`                             | List All Users                             | Admin only        |
+| GET    | `/users/:id`                          | Get user by ID, only user id itself        | Admin/Self-Access |
+| PUT    | `/users/:id`                          | Update user                                | Admin/Self-Access |
+| DELETE | `/users/:id`                          | Delete user                                | Admin only        |
 
 ### Categories
 
