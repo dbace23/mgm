@@ -1,6 +1,6 @@
-# EcoMart – Eco-Friendly E‑Commerce Backend (Golang)
+# MyGreenMarket – Eco-Friendly E‑Commerce Backend (Golang)
 
-EcoMart is an **eco‑friendly e‑commerce backend** that powers a marketplace for sustainable products.  
+MGM is an **eco‑friendly e‑commerce backend** that powers a marketplace for sustainable products.  
 It is built in **Golang** using **Echo**, **PostgreSQL**, and a clean, modular architecture.
 
 ---
@@ -398,3 +398,4 @@ This repo is accompanied by a **Postman collection** (JSON) that you can import 
 
 - **Farhan,Fandi,Halim & Zian** 
 - This backend was designed as part of an **eco‑friendly e‑commerce** concept app for hactiv8 project.
+
