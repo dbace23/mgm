@@ -13,6 +13,7 @@ type ProductRepository interface {
 	Create(ctx context.Context, product *domain.Product) error
 	FindByID(ctx context.Context, id uint64) (domain.Product, error)
 	FindAll(ctx context.Context) ([]domain.Product, error)
+	FindAllWithPagination(ctx context.Context, page, limit int) ([]domain.Product, int64, error)
 	Update(ctx context.Context, product *domain.Product) error
 	Delete(ctx context.Context, id uint64) error
 }
@@ -40,6 +41,21 @@ func (s *productService) GetAllProducts(ctx context.Context) ([]domain.Product, 
 	}
 
 	return product, nil
+}
+
+func (s *productService) GetAllProductsWithPagination(ctx context.Context, page, limit int) ([]domain.Product, int64, error) {
+	if err := ctx.Err(); err != nil {
+		logger.Error("context error when get all product")
+		return nil, 0, fmt.Errorf("context error: %w", err)
+	}
+
+	products, totalCount, err := s.productRepo.FindAllWithPagination(ctx, page, limit)
+	if err != nil {
+		logger.Error("Failed to find all product with pagination", err)
+		return nil, 0, err
+	}
+
+	return products, totalCount, nil
 }
 
 func (s *productService) GetProductByID(ctx context.Context, id uint) (*domain.Product, error) {

@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 )
@@ -14,6 +15,7 @@ type Config struct {
 	JWT      JWTConfig
 	Mailjet  MailjetConfig
 	Xendit   XenditConfig
+	Redis    RedisConfig
 }
 
 type MailjetConfig struct {
@@ -50,13 +52,26 @@ type JWTConfig struct {
 }
 
 type XenditConfig struct {
-	XenditSecretKey string
-	XenditUrl       string
-	RedirectUrl     string
+	XenditSecretKey                string
+	XenditUrl                      string
+	RedirectUrl                    string
+	XenditWebhookVerificationToken string
+}
+
+type RedisConfig struct {
+	RedisHost     string
+	RedisPort     string
+	RedisPassword string
+	RedisDB       int
 }
 
 func Load() (*Config, error) {
 	_ = godotenv.Load()
+
+	redisDB, err := strconv.Atoi(os.Getenv("REDIS_DB"))
+	if err != nil {
+		return nil, errors.New("missing redis database")
+	}
 
 	cfg := &Config{
 		App: AppConfig{
@@ -88,9 +103,16 @@ func Load() (*Config, error) {
 			MailjetSenderName:        getEnv("MAILJET_SENDER_NAME", ""),
 		},
 		Xendit: XenditConfig{
-			XenditSecretKey: getEnv("XENDIT_SECRET_KEY", ""),
-			XenditUrl:       getEnv("XENDIT_URL", ""),
-			RedirectUrl:     getEnv("REDIRECT_URL", ""),
+			XenditSecretKey:                getEnv("XENDIT_SECRET_KEY", ""),
+			XenditUrl:                      getEnv("XENDIT_URL", ""),
+			RedirectUrl:                    getEnv("REDIRECT_URL", ""),
+			XenditWebhookVerificationToken: getEnv("XENDIT_WEBHOOK_VERIFICATION_TOKEN", ""),
+		},
+		Redis: RedisConfig{
+			RedisHost:     getEnv("REDIS_HOST", "localhost"),
+			RedisPort:     getEnv("REDIS_PORT", "6379"),
+			RedisPassword: getEnv("REDIS_PASSWORD", ""),
+			RedisDB:       redisDB,
 		},
 	}
 

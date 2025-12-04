@@ -14,6 +14,8 @@ import (
 	userService "myGreenMarket/business/user"
 	"myGreenMarket/internal/middleware"
 	"myGreenMarket/internal/repository/notification"
+	redisRepo "myGreenMarket/internal/repository/redis"
+	"myGreenMarket/pkg/database/redis"
 	"myGreenMarket/pkg/metrics"
 
 	psqlRepo "myGreenMarket/internal/repository/postgres"
@@ -51,8 +53,15 @@ func main() {
 	if err != nil {
 		logger.Fatal("Failed to connect to database", "error", err)
 	}
-
 	logger.Info("Database connected successfully")
+
+	// init redis
+	redisClient, err := redis.NewRedisClient(cfg)
+	if err != nil {
+		log.Fatalf("Failed to connect to Redis: %v", err)
+	}
+	defer redis.CloseRedisClient(redisClient)
+	logger.Info("Successfully connected to Redis")
 
 	// Init notification from mailjet
 	mailjetEmail := notification.NewMailjetRepository(
@@ -79,6 +88,7 @@ func main() {
 
 	// Init repo
 	userRepo := psqlRepo.NewUserRepository(db)
+	tokenRepo := redisRepo.NewTokenRepository(redisClient)
 	ordersRepo := psqlRepo.NewOrdersRepository(db)
 	productsRepo := psqlRepo.NewProductRepository(db)
 	paymentsRepo := psqlRepo.NewPaymentsRepository(db)
@@ -90,7 +100,7 @@ func main() {
 	userCtxRepo := psqlRepo.NewUserContextRepository(db)
 
 	// Init service
-	userService := userService.NewUserService(userRepo, validate, mailjetEmail, cfg.App.AppEmailVerificationKey, cfg.App.AppDeploymentUrl)
+	userService := userService.NewUserService(userRepo, tokenRepo, validate, mailjetEmail, cfg.App.AppEmailVerificationKey, cfg.App.AppDeploymentUrl)
 	ordersService := orders.NewOrdersService(ordersRepo, productsRepo)
 	paymentsService := payments.NewPaymentsService(paymentsRepo, xenditRepo, userRepo, ordersRepo, productsRepo)
 	productService := product.NewProductService(productsRepo)
@@ -116,7 +126,7 @@ func main() {
 	productHandler := rest.NewProductHandler(productService)
 	ordersHandler := rest.NewOrdersHandler(ordersService)
 	paymentsHandler := rest.NewPaymentsHandler(paymentsService)
-	webhookHandler := rest.NewWebhookController(paymentsService)
+	webhookHandler := rest.NewWebhookHandler(paymentsService, cfg.Xendit.XenditWebhookVerificationToken)
 	banditHandler := rest.NewBanditHandler(banditService)
 	mockRecoHandler := rest.NewMockRecommendationHandler(mockRecoService)
 	banditAdminHandler := rest.NewBanditAdminHandler(cfgRepo, segmentRepo)
@@ -175,11 +185,14 @@ func main() {
 	// Auth middleware
 	authRequired := middleware.AuthMiddleware()
 	adminOnly := middleware.AdminOnly()
+	selfOrAdmin := middleware.SelfOrAdmin()
 
-	// authRequired := middleware.AuthMiddleware()
+	// Redis-based auth middleware (untuk route yang memerlukan validasi Redis)
+	authWithRedis := middleware.AuthMiddlewareWithRedis(userService)
+
 	// Setup routes
 	api := e.Group("/api/v1")
-	router.SetupUserRoutes(api, userHandler)
+	router.SetupUserRoutes(api, userHandler, authWithRedis, selfOrAdmin, adminOnly)
 	router.SetupProductRoutes(api, productHandler, authRequired, adminOnly)
 	router.SetOrdersRoutes(api, ordersHandler)
 	router.SetPaymentsRoutes(api, paymentsHandler)

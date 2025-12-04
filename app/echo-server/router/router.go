@@ -7,23 +7,38 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func SetupUserRoutes(api *echo.Group, handler *rest.UserHandler) {
+func SetupUserRoutes(api *echo.Group, handler *rest.UserHandler, authRequired echo.MiddlewareFunc, selfOrAdmin echo.MiddlewareFunc, adminOnly echo.MiddlewareFunc) {
 	users := api.Group("/users")
 
+	// Public routes
 	users.GET("/email-verification/:code", handler.VerifyEmail)
 	users.POST("/register", handler.Register)
 	users.POST("/login", handler.Login)
+
+	// Protected routes - require authentication
+	users.POST("/logout", handler.Logout, authRequired)
+	users.POST("/refresh", handler.RefreshToken, authRequired)
+
+	// Self or Admin
+	users.PUT("/:id", handler.UpdateUser, authRequired, selfOrAdmin)
+	users.GET("/:id", handler.GetUserByID, authRequired, selfOrAdmin)
+
+	// Admin only routes
+	users.GET("", handler.GetAllUsers, authRequired, adminOnly)
+	users.DELETE("/:id", handler.DeleteUser, authRequired, adminOnly)
 }
 
 func SetupProductRoutes(api *echo.Group, handler *rest.ProductHandler, authRequired echo.MiddlewareFunc, adminOnly echo.MiddlewareFunc) {
 	products := api.Group("/products")
 
-	products.GET("", handler.GetAllProducts, authRequired)
-	products.GET("/:id", handler.GetProductByID, authRequired)
+	// Public routes
+	products.GET("", handler.GetAllProducts)
+	products.GET("/:id", handler.GetProductByID)
+
+	// Admin only routes
 	products.POST("", handler.CreateProduct, authRequired, adminOnly)
 	products.PUT("/:id", handler.UpdateProduct, authRequired, adminOnly)
 	products.DELETE("/:id", handler.DeleteProduct, authRequired, adminOnly)
-
 }
 
 func SetOrdersRoutes(api *echo.Group, ordersHandler *rest.OrdersHandler) {
@@ -45,7 +60,7 @@ func SetPaymentsRoutes(api *echo.Group, paymentsHandler *rest.PaymentsHandler) {
 	api.GET("/paid", paymentsHandler.PaidResponse)
 }
 
-func SetWebhookHandler(api *echo.Group, webhookHandler *rest.WebhookController) {
+func SetWebhookHandler(api *echo.Group, webhookHandler *rest.WebhookHandler) {
 	webhook := api.Group("/webhook")
 	webhook.POST("/handler", webhookHandler.HandleWebhook)
 }

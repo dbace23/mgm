@@ -63,6 +63,39 @@ func (r *ProductRepository) FindAll(ctx context.Context) ([]domain.Product, erro
 	return products, nil
 }
 
+func (r *ProductRepository) FindAllWithPagination(ctx context.Context, page, limit int) ([]domain.Product, int64, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, 0, fmt.Errorf("context error: %w", err)
+	}
+
+	// Set default values
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 30 // Default limit 30
+	}
+
+	// Calculate offset
+	offset := (page - 1) * limit
+
+	var products []domain.Product
+	var totalCount int64
+
+	// Get total count
+	if err := r.DB.WithContext(ctx).Model(&domain.Product{}).Count(&totalCount).Error; err != nil {
+		return nil, 0, fmt.Errorf("failed to count products: %w", err)
+	}
+
+	// Get paginated products
+	err := r.DB.WithContext(ctx).Limit(limit).Offset(offset).Find(&products).Error
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to find products: %w", err)
+	}
+
+	return products, totalCount, nil
+}
+
 func (r *ProductRepository) Update(ctx context.Context, product *domain.Product) error {
 	if err := ctx.Err(); err != nil {
 		return fmt.Errorf("context error: %w", err)
@@ -72,6 +105,7 @@ func (r *ProductRepository) Update(ctx context.Context, product *domain.Product)
 	updateData := map[string]interface{}{
 		"product_id":       product.ProductID,
 		"product_skuid":    product.ProductSKUID,
+		"category_id":      product.CategoryID,
 		"is_green_tag":     product.IsGreenTag,
 		"product_name":     product.ProductName,
 		"product_category": product.ProductCategory,
