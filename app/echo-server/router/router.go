@@ -34,6 +34,7 @@ func SetupProductRoutes(api *echo.Group, handler *rest.ProductHandler, authRequi
 	// Public routes
 	products.GET("", handler.GetAllProducts)
 	products.GET("/:id", handler.GetProductByID)
+	products.GET("/category/:categoryId", handler.GetProductsByCategory)
 
 	// Admin only routes
 	products.POST("", handler.CreateProduct, authRequired, adminOnly)

@@ -24,7 +24,8 @@ func (r *CategoryRepository) Create(ctx context.Context, category *domain.Catego
 		return fmt.Errorf("context error: %w", err)
 	}
 
-	if err := r.DB.WithContext(ctx).Create(category).Error; err != nil {
+	// Omit category_id to let database auto-generate it
+	if err := r.DB.WithContext(ctx).Omit("CategoryID").Create(category).Error; err != nil {
 		return fmt.Errorf("failed to create category: %w", err)
 	}
 

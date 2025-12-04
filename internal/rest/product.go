@@ -15,6 +15,7 @@ import (
 type ProductService interface {
 	GetAllProducts(ctx context.Context) ([]domain.Product, error)
 	GetAllProductsWithPagination(ctx context.Context, page, limit int) ([]domain.Product, int64, error)
+	GetProductsByCategory(ctx context.Context, categoryID uint64) ([]domain.Product, error)
 	GetProductByID(ctx context.Context, id uint) (*domain.Product, error)
 	CreateProduct(ctx context.Context, product *domain.Product) (*domain.Product, error)
 	UpdateProduct(ctx context.Context, product *domain.Product) (*domain.Product, error)
@@ -105,6 +106,35 @@ func (h *ProductHandler) GetAllProducts(c echo.Context) error {
 		"limit":       limit,
 		"total_items": totalCount,
 		"total_pages": totalPages,
+	})
+}
+
+func (h *ProductHandler) GetProductsByCategory(c echo.Context) error {
+	categoryIDStr := c.Param("categoryId")
+
+	categoryID, err := strconv.ParseUint(categoryIDStr, 10, 64)
+	if err != nil {
+		logger.Error("Invalid category id", err)
+		return c.JSON(http.StatusBadRequest, ResponseError{Message: "invalid category id"})
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request().Context(), h.timeout)
+	defer cancel()
+
+	products, err := h.productService.GetProductsByCategory(ctx, categoryID)
+	if err != nil {
+		logger.Error("Failed to find products by category", err)
+		if err.Error() == "invalid category id" {
+			return c.JSON(http.StatusBadRequest, ResponseError{Message: err.Error()})
+		}
+		return c.JSON(http.StatusInternalServerError, ResponseError{Message: err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"message":     "successfully get products by category",
+		"category_id": categoryID,
+		"products":    products,
+		"total":       len(products),
 	})
 }
 
