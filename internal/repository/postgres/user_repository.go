@@ -77,7 +77,7 @@ func (r *UserRepository) Update(ctx context.Context, user *domain.User) error {
 	user.UpdatedAt = time.Now()
 
 	if err := r.DB.WithContext(ctx).Model(&domain.User{}).Where("id = ?", user.ID).
-		Select("full_name", "password", "updated_at").
+		Select("full_name", "password", "wallet", "updated_at").
 		Updates(user).Error; err != nil {
 		return err
 	}
