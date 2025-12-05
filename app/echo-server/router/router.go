@@ -66,7 +66,7 @@ func SetWebhookHandler(api *echo.Group, webhookHandler *rest.WebhookHandler) {
 }
 
 func SetBanditRoutes(api *echo.Group, handler *rest.BanditHandler) {
-	reco := api.Group("/recommendations")
+	reco := api.Group("/recommendations", middleware.AuthMiddleware())
 	reco.GET("", handler.Recommend)
 	reco.GET("/debug", handler.DebugRecommend)
 	reco.POST("/feedback", handler.Feedback)
@@ -79,7 +79,7 @@ func SetMockRecommendationRoutes(api *echo.Group, h *rest.MockRecommendationHand
 
 func SetBanditAdminRoutes(api *echo.Group, handler *rest.BanditAdminHandler) {
 
-	admin := api.Group("/admin/bandit")
+	admin := api.Group("/admin/bandit", middleware.AuthMiddleware())
 
 	admin.GET("/config", handler.GetConfig)
 	admin.PUT("/config", handler.UpsertConfig)
