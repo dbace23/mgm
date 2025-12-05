@@ -96,6 +96,20 @@ func (r *ProductRepository) FindAllWithPagination(ctx context.Context, page, lim
 	return products, totalCount, nil
 }
 
+func (r *ProductRepository) FindByCategoryID(ctx context.Context, categoryID uint64) ([]domain.Product, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("context error: %w", err)
+	}
+
+	var products []domain.Product
+	err := r.DB.WithContext(ctx).Where("category_id = ?", categoryID).Find(&products).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to find products by category: %w", err)
+	}
+
+	return products, nil
+}
+
 func (r *ProductRepository) Update(ctx context.Context, product *domain.Product) error {
 	if err := ctx.Err(); err != nil {
 		return fmt.Errorf("context error: %w", err)
