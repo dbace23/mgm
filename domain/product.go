@@ -35,10 +35,6 @@ type Product struct {
 	CreatedAt       time.Time `gorm:"column:created_at"`
 }
 
-// TODO: Apakah nambah fitur updated_at dan deleted_at
-// UpdatedAt       time.Time      `gorm:"column:updated_at"`
-// 	DeletedAt       gorm.DeletedAt `gorm:"index"`
-
 func (Product) TableName() string {
 	return "products"
 }

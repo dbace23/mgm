@@ -182,7 +182,6 @@ func (s *userService) Login(ctx context.Context, email, password, ipAddress, use
 
 	if err := s.tokenRepo.StoreToken(ctx, userIdStr, token, tokenData, TokenExpiryDuration); err != nil {
 		logger.Error("Failed to store token in Redis", err)
-		// Log the error if fail
 		logger.Warn("Continuing without Redis token storage")
 	}
 
@@ -191,7 +190,6 @@ func (s *userService) Login(ctx context.Context, email, password, ipAddress, use
 }
 
 func (s *userService) ValidateTokenFromRedis(ctx context.Context, token string) (string, error) {
-	// Check if token is blacklisted
 	isBlacklisted, err := s.tokenRepo.IsTokenBlacklisted(ctx, token)
 	if err != nil {
 		logger.Error("Failed to check token blacklist", err)
@@ -213,7 +211,6 @@ func (s *userService) ValidateTokenFromRedis(ctx context.Context, token string) 
 }
 
 func (s *userService) RefreshToken(ctx context.Context, oldToken, ipAddress, userAgent string) (string, domain.User, error) {
-	// validate old token
 	userID, err := s.ValidateTokenFromRedis(ctx, oldToken)
 	if err != nil {
 		return "", domain.User{}, err
@@ -227,7 +224,6 @@ func (s *userService) RefreshToken(ctx context.Context, oldToken, ipAddress, use
 		return "", domain.User{}, errors.New("user not found")
 	}
 
-	// generate new token
 	newToken, err := utils.GenerateJWT(userID, user.Role)
 	if err != nil {
 		logger.Error("Failed to generate new token", err)
@@ -239,7 +235,6 @@ func (s *userService) RefreshToken(ctx context.Context, oldToken, ipAddress, use
 		logger.Warn("Failed to blacklist old token", err)
 	}
 
-	// Then delete old token from Redis
 	if err := s.tokenRepo.DeleteToken(ctx, userID, oldToken); err != nil {
 		logger.Warn("Failed to delete old token", err)
 	}
@@ -268,7 +263,6 @@ func (s *userService) RefreshToken(ctx context.Context, oldToken, ipAddress, use
 func (s *userService) Logout(ctx context.Context, userID uint, token string) error {
 	userIDStr := strconv.FormatUint(uint64(userID), 10)
 
-	// Blacklist the token to prevent reuse
 	if err := s.tokenRepo.BlaclistToken(ctx, token, TokenExpiryDuration); err != nil {
 		logger.Error("Failed to blacklist token during logout", err)
 		return errors.New("failed to logout")
@@ -277,7 +271,6 @@ func (s *userService) Logout(ctx context.Context, userID uint, token string) err
 	// Delete token from Redis
 	if err := s.tokenRepo.DeleteToken(ctx, userIDStr, token); err != nil {
 		logger.Error("Failed to delete token during logout", err)
-		// Don't return error here, token is already blacklisted
 		logger.Warn("Token blacklisted but not deleted from Redis")
 	}
 
@@ -372,13 +365,11 @@ func (s *userService) UpdateUser(ctx context.Context, id uint, updateData *domai
 	}
 
 	if updateData.Password != "" {
-		// Validate password
 		if err := s.validate.Var(updateData.Password, "required,min=6"); err != nil {
 			logger.Error("Invalid password", err)
 			return domain.User{}, errors.New("password must be at least 6 characters")
 		}
 
-		// Hash new password
 		passwordHash, err := utils.HashPassword(updateData.Password)
 		if err != nil {
 			logger.Error("Failed to hash password", err)
